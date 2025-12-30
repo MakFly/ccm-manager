@@ -16,7 +16,7 @@ import {
   type Provider,
   type ProviderEnv
 } from './config.js';
-import { runClaude } from './runner.js';
+import { runClaude, syncSharedResources, type SyncResult } from './runner.js';
 import { generateAliases, getSetupInstructions } from './aliases.js';
 
 // Read version from package.json
@@ -256,6 +256,63 @@ program
   .description('Show config file path')
   .action(() => {
     console.log(chalk.bold('Config file:'), chalk.cyan(getConfigPath()));
+  });
+
+// Sync command
+program
+  .command('sync')
+  .description('Sync shared resources (commands, settings, plugins) from ~/.claude')
+  .option('-a, --all', 'Sync all providers')
+  .option('-f, --force', 'Force replace existing files/directories')
+  .action((options: { all?: boolean; force?: boolean }) => {
+    const force = options.force ?? false;
+
+    const displayResults = (providerKey: string, results: SyncResult[] | null) => {
+      console.log(chalk.bold(`\n${providerKey}:`));
+      if (results === null) {
+        console.log(chalk.gray('  (source directory - skip)'));
+        return;
+      }
+      for (const { resource, status } of results) {
+        const icon = status === 'exists' ? chalk.gray('○') :
+                     status === 'created' ? chalk.green('✓') :
+                     status === 'forced' ? chalk.yellow('⚡') :
+                     chalk.red('✗');
+        const label = status === 'exists' ? chalk.gray('already synced') :
+                      status === 'created' ? chalk.green('created') :
+                      status === 'forced' ? chalk.yellow('forced') :
+                      chalk.red('skipped');
+        console.log(`  ${icon} ${resource} ${label}`);
+      }
+    };
+
+    if (options.all) {
+      const providers = listProviders();
+      for (const { key, provider } of providers) {
+        const results = syncSharedResources(provider.configDir, force);
+        displayResults(key, results);
+      }
+    } else {
+      const config = readConfig();
+      const provider = getCurrentProvider();
+      if (!provider) {
+        console.log(chalk.red('No provider configured'));
+        process.exit(1);
+      }
+      const results = syncSharedResources(provider.configDir, force);
+      displayResults(config.current, results);
+    }
+
+    console.log('');
+    console.log(chalk.gray('Synced from ~/.claude: commands, settings.json, plugins'));
+  });
+
+// Help command alias
+program
+  .command('help')
+  .description('Show help')
+  .action(() => {
+    program.help();
   });
 
 // Update command
