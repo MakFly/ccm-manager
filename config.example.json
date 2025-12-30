@@ -1,0 +1,23 @@
+{
+  "current": "anthropic",
+  "providers": {
+    "glm": {
+      "name": "GLM-4.7",
+      "type": "api_key",
+      "description": "GLM-4.7 via BigModel",
+      "configDir": "~/.claude-glm",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "your-token-here",
+        "ANTHROPIC_MODEL": "glm-4.7",
+        "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+        "ANTHROPIC_API_KEY": ""
+      }
+    },
+    "anthropic": {
+      "name": "Anthropic (OAuth)",
+      "type": "oauth",
+      "description": "Anthropic OAuth via claude.ai",
+      "configDir": "~/.claude"
+    }
+  }
+}
