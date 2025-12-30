@@ -6,6 +6,7 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 
 - Switch between Anthropic (OAuth) and custom API providers (GLM, etc.)
 - **Interactive provider management**: `ccs add`, `ccs remove`
+- **Self-update**: `ccs update`
 - Simple commands: `ccs glm`, `ccs anthropic`
 - Shell aliases: `claude-glm`, `claude-anthropic`, `ccm`, `ccc`
 - Auto-clean: removes large cache files on startup
@@ -13,6 +14,24 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 - **No TTY issues**: runs Claude in foreground (fixes "suspended tty output" bug)
 
 ## Installation
+
+### Option 1: npm/bun (Recommended)
+
+```bash
+# With bun (faster)
+bun install -g @makfly/ccs
+
+# Or with npm
+npm install -g @makfly/ccs
+```
+
+### Option 2: One-line install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MakFly/ccm-manager/main/install.sh | bash
+```
+
+### Option 3: Manual install
 
 ```bash
 # Clone
@@ -25,6 +44,17 @@ cd ~/.ccs && bun install
 echo 'export PATH="$HOME/.ccs/bin:$PATH"' >> ~/.zshrc
 echo 'eval "$(ccs alias)"' >> ~/.zshrc
 source ~/.zshrc
+```
+
+## Updating
+
+```bash
+# Self-update (auto-detects bun/npm)
+ccs update
+
+# Or manually
+bun update -g @makfly/ccs
+npm update -g @makfly/ccs
 ```
 
 ## Quick Start
@@ -57,6 +87,7 @@ ccs run glm
 | `ccs run [provider]` | Run Claude (optional provider switch) |
 | `ccs add <key>` | Add a new provider interactively |
 | `ccs remove <key>` / `ccs rm` | Remove a provider |
+| `ccs update` | Update CCS to latest version |
 | `ccs alias` | Generate shell aliases |
 | `ccs alias -i` | Show shell setup instructions |
 | `ccs config` | Show config file path |
@@ -110,7 +141,7 @@ Config is stored at `~/.ccs/config.json` (or `$CCS_CONFIG_PATH` if set).
 | `oauth` | Anthropic OAuth login | `configDir` |
 | `api_key` | Custom API provider | `configDir`, `env` with API credentials |
 
-### Environment Variables
+### Environment Variables for Providers
 
 For `api_key` providers, you can set:
 
@@ -173,9 +204,22 @@ Delete the config file to reset:
 rm ~/.ccs/config.json
 ```
 
+## Uninstall
+
+```bash
+# If installed via npm/bun
+bun remove -g @makfly/ccs
+# or
+npm uninstall -g @makfly/ccs
+
+# If installed manually
+rm -rf ~/.ccs
+# Remove lines from ~/.zshrc or ~/.bashrc
+```
+
 ## Requirements
 
-- [Bun](https://bun.sh/) runtime
+- [Bun](https://bun.sh/) or Node.js >= 18
 - [Claude Code](https://claude.ai) CLI installed
 
 ## License

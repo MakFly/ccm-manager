@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { createInterface } from 'readline';
 import { createRequire } from 'module';
+import { spawnSync } from 'child_process';
 import {
   readConfig,
   getCurrentProvider,
@@ -255,6 +256,38 @@ program
   .description('Show config file path')
   .action(() => {
     console.log(chalk.bold('Config file:'), chalk.cyan(getConfigPath()));
+  });
+
+// Update command
+program
+  .command('update')
+  .description('Update CCS to the latest version')
+  .action(() => {
+    console.log(chalk.bold('Checking for updates...'));
+
+    // Detect package manager
+    const hasBun = spawnSync('which', ['bun'], { encoding: 'utf-8' }).status === 0;
+    const pm = hasBun ? 'bun' : 'npm';
+    const args = hasBun
+      ? ['update', '-g', '@makfly/ccs']
+      : ['update', '-g', '@makfly/ccs'];
+
+    console.log(chalk.gray(`[ccs] Using ${pm} to update...`));
+
+    const result = spawnSync(pm, args, {
+      stdio: 'inherit',
+      shell: false
+    });
+
+    if (result.status === 0) {
+      // Get new version
+      const newPkg = require('../package.json');
+      console.log(chalk.green(`\n✓ CCS updated to v${newPkg.version}`));
+    } else {
+      console.log(chalk.red('\n✗ Update failed'));
+      console.log(chalk.gray('Try manually: bun update -g @makfly/ccs'));
+      process.exit(1);
+    }
   });
 
 // Default action: if arg matches a provider, switch to it
