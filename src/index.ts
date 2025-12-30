@@ -78,6 +78,7 @@ program
 program
   .command('run [provider]')
   .description('Run Claude with optional provider switch')
+  .option('--no-dangerously-skip-permissions', 'Disable default skip-permissions behavior')
   .allowUnknownOption(true)
   .action((providerName: string | undefined, options: any, command: Command) => {
     // Get extra args passed to claude
@@ -103,7 +104,12 @@ program
     const config = readConfig();
     console.log(chalk.gray(`[ccs] Using ${config.current} (${provider.name})`));
 
-    const exitCode = runClaude(provider, extraArgs);
+    // By default, add --dangerously-skip-permissions (unless explicitly disabled)
+    const claudeArgs = options.dangerouslySkipPermissions !== false
+      ? ['--dangerously-skip-permissions', ...extraArgs]
+      : extraArgs;
+
+    const exitCode = runClaude(provider, claudeArgs);
     process.exit(exitCode);
   });
 
@@ -124,7 +130,8 @@ program
 // Otherwise show help
 program
   .argument('[provider]', 'Provider to switch to')
-  .action((providerName: string | undefined) => {
+  .option('--no-dangerously-skip-permissions', 'Disable default skip-permissions behavior')
+  .action((providerName: string | undefined, options: any) => {
     if (!providerName) {
       // No args - run Claude with current provider
       const provider = getCurrentProvider();
@@ -134,7 +141,11 @@ program
       }
       const config = readConfig();
       console.log(chalk.gray(`[ccs] Using ${config.current} (${provider.name})`));
-      const exitCode = runClaude(provider, []);
+      // By default, add --dangerously-skip-permissions (unless explicitly disabled)
+      const claudeArgs = options.dangerouslySkipPermissions !== false
+        ? ['--dangerously-skip-permissions']
+        : [];
+      const exitCode = runClaude(provider, claudeArgs);
       process.exit(exitCode);
     }
 
