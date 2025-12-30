@@ -19,10 +19,10 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 
 ```bash
 # With bun (faster)
-bun install -g @makfly/ccs
+bun install -g cc-switch
 
 # Or with npm
-npm install -g @makfly/ccs
+npm install -g cc-switch
 ```
 
 ### Option 2: One-line install
@@ -53,8 +53,8 @@ source ~/.zshrc
 ccs update
 
 # Or manually
-bun update -g @makfly/ccs
-npm update -g @makfly/ccs
+bun update -g cc-switch
+npm update -g cc-switch
 ```
 
 ## Quick Start
@@ -208,9 +208,9 @@ rm ~/.ccs/config.json
 
 ```bash
 # If installed via npm/bun
-bun remove -g @makfly/ccs
+bun remove -g cc-switch
 # or
-npm uninstall -g @makfly/ccs
+npm uninstall -g cc-switch
 
 # If installed manually
 rm -rf ~/.ccs

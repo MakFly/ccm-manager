@@ -22,7 +22,7 @@ fi
 
 # Method 1: Try npm/bun global install first
 echo "Attempting global install via $PM..."
-if $PM install -g @makfly/ccs 2>/dev/null; then
+if $PM install -g cc-switch 2>/dev/null; then
     echo ""
     echo "✓ CCS installed successfully!"
     echo ""

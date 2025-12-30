@@ -268,9 +268,7 @@ program
     // Detect package manager
     const hasBun = spawnSync('which', ['bun'], { encoding: 'utf-8' }).status === 0;
     const pm = hasBun ? 'bun' : 'npm';
-    const args = hasBun
-      ? ['update', '-g', '@makfly/ccs']
-      : ['update', '-g', '@makfly/ccs'];
+    const args = ['update', '-g', 'cc-switch'];
 
     console.log(chalk.gray(`[ccs] Using ${pm} to update...`));
 
@@ -285,7 +283,7 @@ program
       console.log(chalk.green(`\n✓ CCS updated to v${newPkg.version}`));
     } else {
       console.log(chalk.red('\n✗ Update failed'));
-      console.log(chalk.gray('Try manually: bun update -g @makfly/ccs'));
+      console.log(chalk.gray('Try manually: bun update -g cc-switch'));
       process.exit(1);
     }
   });
