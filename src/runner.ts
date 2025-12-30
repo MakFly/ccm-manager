@@ -8,6 +8,7 @@ const SHARED_RESOURCES = [
   'commands',       // Custom slash commands
   'settings.json',  // Status line, plugins, etc.
   'plugins',        // Installed plugins
+  'skills',         // User skills (frontend-design, etc.)
 ];
 
 const CLEAN_THRESHOLDS = {
