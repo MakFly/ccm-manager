@@ -1,5 +1,5 @@
 import { spawnSync, type SpawnSyncOptions } from 'child_process';
-import { existsSync, statSync, rmSync } from 'fs';
+import { existsSync, statSync, rmSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { expandPath, type Provider } from './config.js';
 
@@ -15,7 +15,6 @@ function getDirSize(path: string): number {
     if (!stat.isDirectory()) return stat.size;
 
     // Simple recursive size calculation
-    const { readdirSync } = require('fs');
     let size = 0;
     for (const file of readdirSync(path)) {
       size += getDirSize(join(path, file));

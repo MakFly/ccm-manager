@@ -1,6 +1,6 @@
 {
   "name": "ccs",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Claude Code Switch - Lightweight model switcher for Claude Code",
   "type": "module",
   "main": "src/index.ts",
@@ -11,7 +11,8 @@
     "start": "bun run src/index.ts"
   },
   "dependencies": {
+    "chalk": "^5.3.0",
     "commander": "^12.1.0",
-    "chalk": "^5.3.0"
+    "zod": "^4.2.1"
   }
 }

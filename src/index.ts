@@ -1,22 +1,48 @@
 #!/usr/bin/env bun
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { createInterface } from 'readline';
+import { createRequire } from 'module';
 import {
   readConfig,
   getCurrentProvider,
   getProvider,
   setCurrentProvider,
-  listProviders
+  listProviders,
+  addProvider,
+  removeProvider,
+  getConfigPath,
+  type Provider,
+  type ProviderEnv
 } from './config.js';
 import { runClaude } from './runner.js';
 import { generateAliases, getSetupInstructions } from './aliases.js';
 
+// Read version from package.json
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
+
 const program = new Command();
+
+// Interactive prompt helper
+function prompt(question: string): Promise<string> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
 
 program
   .name('ccs')
   .description('Claude Code Switch - Lightweight model switcher')
-  .version('1.0.0');
+  .version(version);
 
 // Status command
 program
@@ -47,11 +73,14 @@ program
   .action(() => {
     const providers = listProviders();
     console.log(chalk.bold('\nProviders:\n'));
-    for (const { name, provider, current } of providers) {
+    for (const { key, provider, current } of providers) {
       const marker = current ? chalk.green('●') : chalk.gray('○');
-      const label = current ? chalk.cyan.bold(name) : chalk.white(name);
+      const label = current ? chalk.cyan.bold(key) : chalk.white(key);
       console.log(`  ${marker} ${label}`);
       console.log(chalk.gray(`    ${provider.name}`));
+      if (provider.env?.ANTHROPIC_MODEL) {
+        console.log(chalk.gray(`    Model: ${provider.env.ANTHROPIC_MODEL}`));
+      }
     }
     console.log('');
   });
@@ -70,6 +99,100 @@ program
     } else {
       console.log(chalk.red(`Provider '${name}' not found`));
       console.log(chalk.gray('Run "ccs list" to see available providers'));
+      process.exit(1);
+    }
+  });
+
+// Add command (interactive)
+program
+  .command('add <key>')
+  .description('Add a new provider interactively')
+  .action(async (key: string) => {
+    console.log(chalk.bold(`\nAdding provider: ${chalk.cyan(key)}\n`));
+
+    // Provider name
+    const name = await prompt(chalk.white('Display name (e.g., "GLM-4.7"): '));
+    if (!name) {
+      console.log(chalk.red('Name is required'));
+      process.exit(1);
+    }
+
+    // Provider type
+    const typeInput = await prompt(chalk.white('Type [oauth/api_key] (default: api_key): '));
+    const type = (typeInput === 'oauth' ? 'oauth' : 'api_key') as 'oauth' | 'api_key';
+
+    // Config directory
+    const configDirInput = await prompt(chalk.white(`Config directory (default: ~/.claude-${key}): `));
+    const configDir = configDirInput || `~/.claude-${key}`;
+
+    // Description (optional)
+    const description = await prompt(chalk.white('Description (optional): '));
+
+    // Environment variables for api_key type
+    let env: ProviderEnv | undefined;
+    if (type === 'api_key') {
+      console.log(chalk.gray('\nEnvironment variables (press Enter to skip):'));
+
+      const authToken = await prompt(chalk.white('  ANTHROPIC_AUTH_TOKEN: '));
+      const apiKey = await prompt(chalk.white('  ANTHROPIC_API_KEY: '));
+      const model = await prompt(chalk.white('  ANTHROPIC_MODEL: '));
+      const baseUrl = await prompt(chalk.white('  ANTHROPIC_BASE_URL: '));
+
+      env = {};
+      if (authToken) env.ANTHROPIC_AUTH_TOKEN = authToken;
+      if (apiKey) env.ANTHROPIC_API_KEY = apiKey;
+      if (model) env.ANTHROPIC_MODEL = model;
+      if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
+
+      if (Object.keys(env).length === 0) {
+        env = undefined;
+      }
+    }
+
+    const provider: Provider = {
+      name,
+      type,
+      configDir,
+      ...(description && { description }),
+      ...(env && { env })
+    };
+
+    const result = addProvider(key, provider);
+    if (result.success) {
+      console.log(chalk.green(`\n✓ Provider '${key}' added successfully`));
+      console.log(chalk.gray(`  Config: ${getConfigPath()}`));
+    } else {
+      console.log(chalk.red(`\n✗ ${result.error}`));
+      process.exit(1);
+    }
+  });
+
+// Remove command
+program
+  .command('remove <key>')
+  .alias('rm')
+  .description('Remove a provider')
+  .option('-f, --force', 'Skip confirmation')
+  .action(async (key: string, options: { force?: boolean }) => {
+    const provider = getProvider(key);
+    if (!provider) {
+      console.log(chalk.red(`Provider '${key}' not found`));
+      process.exit(1);
+    }
+
+    if (!options.force) {
+      const confirm = await prompt(chalk.yellow(`Remove provider '${key}' (${provider.name})? [y/N]: `));
+      if (confirm.toLowerCase() !== 'y') {
+        console.log(chalk.gray('Cancelled'));
+        return;
+      }
+    }
+
+    const result = removeProvider(key);
+    if (result.success) {
+      console.log(chalk.green(`✓ Provider '${key}' removed`));
+    } else {
+      console.log(chalk.red(`✗ ${result.error}`));
       process.exit(1);
     }
   });
@@ -124,6 +247,14 @@ program
     } else {
       console.log(generateAliases());
     }
+  });
+
+// Config command (show config path)
+program
+  .command('config')
+  .description('Show config file path')
+  .action(() => {
+    console.log(chalk.bold('Config file:'), chalk.cyan(getConfigPath()));
   });
 
 // Default action: if arg matches a provider, switch to it
