@@ -17,6 +17,7 @@ const ProviderSchema = z.object({
   description: z.string().optional(),
   configDir: z.string().min(1, 'configDir is required'),
   env: ProviderEnvSchema.optional(),
+  memoryReset: z.boolean().optional(),  // Aggressive cleanup before each run (for memory-hungry providers)
 });
 
 const ConfigSchema = z.object({

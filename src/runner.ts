@@ -2,6 +2,7 @@ import { spawnSync, type SpawnSyncOptions } from 'child_process';
 import { existsSync, statSync, rmSync, readdirSync, symlinkSync, lstatSync, readlinkSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { expandPath, type Provider } from './config.js';
+import { shouldResetMemory, setLastMemoryReset } from './state.js';
 
 // Shared resources from ~/.claude to sync across all providers
 const SHARED_RESOURCES = [
@@ -15,6 +16,15 @@ const CLEAN_THRESHOLDS = {
   'shell-snapshots': 10 * 1024 * 1024, // 10MB
   'debug': 5 * 1024 * 1024             // 5MB
 };
+
+// Directories to wipe when memoryReset is enabled (prevents OOM on memory-hungry providers like GLM)
+const MEMORY_RESET_TARGETS = [
+  'projects',        // Conversation history per project - main memory hog
+  'file-history',    // Read file cache
+  'session-env',     // Session environment data
+  'plans',           // Plan files
+  'todos',           // Todo cache
+];
 
 function getDirSize(path: string): number {
   if (!existsSync(path)) return 0;
@@ -49,6 +59,27 @@ function autoClean(configDir: string): void {
       }
     }
   }
+}
+
+function resetMemory(configDir: string): number {
+  const dir = expandPath(configDir);
+  let totalCleaned = 0;
+
+  for (const subdir of MEMORY_RESET_TARGETS) {
+    const path = join(dir, subdir);
+    const size = getDirSize(path);
+
+    if (size > 0) {
+      try {
+        rmSync(path, { recursive: true, force: true });
+        totalCleaned += size;
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  return totalCleaned;
 }
 
 function ensureSymlink(source: string, target: string, force = false): boolean {
@@ -132,8 +163,18 @@ export function syncSharedResources(configDir: string, force = false): SyncResul
   return results;
 }
 
-export function runClaude(provider: Provider, args: string[]): number {
+export function runClaude(providerKey: string, provider: Provider, args: string[]): number {
   const configDir = expandPath(provider.configDir);
+
+  // Memory reset for providers that need it (e.g., GLM to prevent OOM)
+  // Only purge if last reset was > 24h ago
+  if (provider.memoryReset && shouldResetMemory(providerKey)) {
+    const cleaned = resetMemory(provider.configDir);
+    if (cleaned > 0) {
+      console.error(`[ccs] Daily memory reset: cleared ${Math.round(cleaned / 1024 / 1024)}MB of cached data`);
+    }
+    setLastMemoryReset(providerKey);
+  }
 
   // Auto-clean before launch
   autoClean(provider.configDir);
@@ -141,10 +182,17 @@ export function runClaude(provider: Provider, args: string[]): number {
   // Share ~/.claude resources (commands, settings.json) across providers
   ensureSharedResources(provider.configDir);
 
-  // Build environment
+  // Build environment with increased memory limit for long conversations
+  const currentNodeOptions = process.env['NODE_OPTIONS'] || '';
+  const hasMaxOldSpace = currentNodeOptions.includes('--max-old-space-size');
+  const nodeOptions = hasMaxOldSpace
+    ? currentNodeOptions
+    : `${currentNodeOptions} --max-old-space-size=8192`.trim();
+
   const env: Record<string, string> = {
     ...process.env,
-    CLAUDE_CONFIG_DIR: configDir
+    CLAUDE_CONFIG_DIR: configDir,
+    NODE_OPTIONS: nodeOptions  // 8GB heap limit to prevent OOM on long conversations
   };
 
   // Add provider-specific env vars

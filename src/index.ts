@@ -2,7 +2,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { createInterface } from 'readline';
-import { createRequire } from 'module';
 import { spawnSync } from 'child_process';
 import {
   readConfig,
@@ -19,9 +18,7 @@ import {
 import { runClaude, syncSharedResources, type SyncResult } from './runner.js';
 import { generateAliases, getSetupInstructions } from './aliases.js';
 
-// Read version from package.json
-const require = createRequire(import.meta.url);
-const { version } = require('../package.json');
+const VERSION = '1.1.0';
 
 const program = new Command();
 
@@ -43,7 +40,7 @@ function prompt(question: string): Promise<string> {
 program
   .name('ccs')
   .description('Claude Code Switch - Lightweight model switcher')
-  .version(version);
+  .version(VERSION);
 
 // Status command
 program
@@ -233,7 +230,7 @@ program
       ? ['--dangerously-skip-permissions', ...extraArgs]
       : extraArgs;
 
-    const exitCode = runClaude(provider, claudeArgs);
+    const exitCode = runClaude(config.current, provider, claudeArgs);
     process.exit(exitCode);
   });
 
@@ -335,9 +332,7 @@ program
     });
 
     if (result.status === 0) {
-      // Get new version
-      const newPkg = require('../package.json');
-      console.log(chalk.green(`\n✓ CCS updated to v${newPkg.version}`));
+      console.log(chalk.green(`\n✓ CCS updated successfully`));
     } else {
       console.log(chalk.red('\n✗ Update failed'));
       console.log(chalk.gray('Try manually: bun update -g cc-switch'));
@@ -364,7 +359,7 @@ program
       const claudeArgs = options.dangerouslySkipPermissions !== false
         ? ['--dangerously-skip-permissions']
         : [];
-      const exitCode = runClaude(provider, claudeArgs);
+      const exitCode = runClaude(config.current, provider, claudeArgs);
       process.exit(exitCode);
     }
 

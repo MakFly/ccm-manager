@@ -4,6 +4,12 @@ node_modules/
 # Config with secrets
 config.json
 
+# Build output
+dist/
+
+# SQLite state
+state.db
+
 # Bun
 bun.lock
 
