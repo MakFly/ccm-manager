@@ -1,5 +1,5 @@
 import { spawnSync, type SpawnSyncOptions } from 'child_process';
-import { existsSync, statSync, rmSync, readdirSync, symlinkSync, lstatSync, readlinkSync, mkdirSync } from 'fs';
+import { existsSync, statSync, rmSync, readdirSync, symlinkSync, lstatSync, readlinkSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { expandPath, type Provider } from './config.js';
 import { shouldResetMemory, setLastMemoryReset } from './state.js';
@@ -10,6 +10,10 @@ const SHARED_RESOURCES = [
   'settings.json',  // Status line, plugins, etc.
   'plugins',        // Installed plugins
   'skills',         // User skills (frontend-design, etc.)
+  'agents',         // Custom agents
+  'CLAUDE.md',      // User instructions
+  'AGENTS.md',      // Agent instructions (symlink to CLAUDE.md usually)
+  'prompts',        // Prompt templates
 ];
 
 const CLEAN_THRESHOLDS = {
@@ -127,6 +131,55 @@ function ensureSharedResources(configDir: string): void {
   }
 }
 
+/**
+ * Sync MCP servers from ~/.claude.json to the provider's config
+ * MCP servers are stored in ~/.claude.json (not ~/.claude/.claude.json)
+ */
+function syncMcpServers(configDir: string): void {
+  const targetDir = expandPath(configDir);
+  const homeDir = expandPath('~');
+
+  // Skip if target is the default config (~/home dir)
+  if (targetDir === homeDir || targetDir === expandPath('~/.claude')) return;
+
+  // Read MCP servers from ~/.claude.json (source of truth)
+  const sourceFile = join(homeDir, '.claude.json');
+  if (!existsSync(sourceFile)) return;
+
+  try {
+    const sourceData = JSON.parse(readFileSync(sourceFile, 'utf-8'));
+    const sourceMcpServers = sourceData.mcpServers || {};
+
+    if (Object.keys(sourceMcpServers).length === 0) return;
+
+    // Read or create target .claude.json inside the config directory
+    const targetFile = join(targetDir, '.claude.json');
+    let targetData: Record<string, unknown> = {};
+    if (existsSync(targetFile)) {
+      try {
+        targetData = JSON.parse(readFileSync(targetFile, 'utf-8'));
+      } catch {
+        targetData = {};
+      }
+    }
+
+    // Merge MCP servers (source overwrites target)
+    const targetMcpServers = (targetData.mcpServers as Record<string, unknown>) || {};
+    const mergedMcpServers = { ...targetMcpServers, ...sourceMcpServers };
+
+    const currentJson = JSON.stringify(targetMcpServers);
+    const mergedJson = JSON.stringify(mergedMcpServers);
+
+    if (currentJson !== mergedJson) {
+      targetData.mcpServers = mergedMcpServers;
+      writeFileSync(targetFile, JSON.stringify(targetData, null, 2));
+      console.error(`[ccs] Synced ${Object.keys(sourceMcpServers).length} MCP server(s) to ${configDir}`);
+    }
+  } catch (error) {
+    console.error(`[ccs] Warning: Could not sync MCP servers: ${error}`);
+  }
+}
+
 export type SyncResult = { resource: string; status: 'created' | 'exists' | 'skipped' | 'forced' };
 
 export function syncSharedResources(configDir: string, force = false): SyncResult[] | null {
@@ -160,7 +213,66 @@ export function syncSharedResources(configDir: string, force = false): SyncResul
     results.push({ resource, status: created ? (force ? 'forced' : 'created') : 'skipped' });
   }
 
+  // Also sync MCP servers
+  const mcpSynced = syncMcpServersForSync(configDir, force);
+  if (mcpSynced !== null) {
+    results.push({ resource: 'mcpServers', status: mcpSynced ? 'created' : 'exists' });
+  }
+
   return results;
+}
+
+/**
+ * Sync MCP servers for the sync command (returns status for reporting)
+ */
+function syncMcpServersForSync(configDir: string, force = false): boolean | null {
+  const targetDir = expandPath(configDir);
+  const homeDir = expandPath('~');
+
+  // Skip if target is the default config
+  if (targetDir === homeDir || targetDir === expandPath('~/.claude')) return null;
+
+  // Read MCP servers from ~/.claude.json (source of truth)
+  const sourceFile = join(homeDir, '.claude.json');
+  if (!existsSync(sourceFile)) return null;
+
+  try {
+    const sourceData = JSON.parse(readFileSync(sourceFile, 'utf-8'));
+    const sourceMcpServers = sourceData.mcpServers || {};
+
+    if (Object.keys(sourceMcpServers).length === 0) return null;
+
+    // Read or create target .claude.json
+    const targetFile = join(targetDir, '.claude.json');
+    let targetData: Record<string, unknown> = {};
+    if (existsSync(targetFile)) {
+      try {
+        targetData = JSON.parse(readFileSync(targetFile, 'utf-8'));
+      } catch {
+        targetData = {};
+      }
+    }
+
+    const targetMcpServers = (targetData.mcpServers as Record<string, unknown>) || {};
+
+    // If force, overwrite; otherwise merge
+    const mergedMcpServers = force
+      ? { ...sourceMcpServers }
+      : { ...targetMcpServers, ...sourceMcpServers };
+
+    const currentJson = JSON.stringify(targetMcpServers);
+    const mergedJson = JSON.stringify(mergedMcpServers);
+
+    if (currentJson !== mergedJson) {
+      targetData.mcpServers = mergedMcpServers;
+      writeFileSync(targetFile, JSON.stringify(targetData, null, 2));
+      return true;
+    }
+
+    return false;
+  } catch {
+    return null;
+  }
 }
 
 export function runClaude(providerKey: string, provider: Provider, args: string[]): number {
@@ -179,8 +291,11 @@ export function runClaude(providerKey: string, provider: Provider, args: string[
   // Auto-clean before launch
   autoClean(provider.configDir);
 
-  // Share ~/.claude resources (commands, settings.json) across providers
+  // Share ~/.claude resources (commands, settings.json, agents, etc.) across providers
   ensureSharedResources(provider.configDir);
+
+  // Sync MCP servers from ~/.claude to this provider
+  syncMcpServers(provider.configDir);
 
   // Build environment with increased memory limit for long conversations
   const currentNodeOptions = process.env['NODE_OPTIONS'] || '';

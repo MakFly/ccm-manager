@@ -12,6 +12,8 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 - Auto-clean: removes large cache files on startup
 - **Config validation**: Zod schema validation with helpful error messages
 - **No TTY issues**: runs Claude in foreground (fixes "suspended tty output" bug)
+- **MCP Sync**: Automatically syncs MCP servers across all providers
+- **Resource Sync**: Shares commands, settings, plugins, skills, agents, CLAUDE.md across providers
 
 ## Installation
 
@@ -87,6 +89,8 @@ ccs run glm
 | `ccs run [provider]` | Run Claude (optional provider switch) |
 | `ccs add <key>` | Add a new provider interactively |
 | `ccs remove <key>` / `ccs rm` | Remove a provider |
+| `ccs sync [provider]` | Sync shared resources & MCP servers |
+| `ccs sync --all` | Sync all providers |
 | `ccs update` | Update CCS to latest version |
 | `ccs alias` | Generate shell aliases |
 | `ccs alias -i` | Show shell setup instructions |
@@ -179,6 +183,53 @@ CCS automatically cleans up large cache directories before launching Claude:
 - `debug/` if > 5MB
 
 This prevents Claude from slowing down due to accumulated cache files.
+
+## Resource Sync
+
+CCS automatically syncs shared resources from `~/.claude` to all provider config directories:
+
+| Resource | Type | Description |
+|----------|------|-------------|
+| `commands/` | symlink | Custom slash commands |
+| `settings.json` | symlink | Status line, plugins config |
+| `plugins/` | symlink | Installed plugins |
+| `skills/` | symlink | User skills |
+| `agents/` | symlink | Custom agents |
+| `CLAUDE.md` | symlink | User instructions |
+| `AGENTS.md` | symlink | Agent instructions |
+| `prompts/` | symlink | Prompt templates |
+
+### Manual Sync
+
+```bash
+# Sync all providers
+ccs sync --all
+
+# Sync with force (recreate symlinks)
+ccs sync --all --force
+
+# Sync specific provider
+ccs sync glm
+```
+
+## MCP Server Sync
+
+CCS automatically syncs MCP servers from `~/.claude.json` to all provider config directories.
+
+When you run `ccs run glm`, your MCP servers (web-search, assistant-ui, etc.) are automatically available.
+
+### How it works
+
+1. MCP servers are stored in `~/.claude.json` (source of truth)
+2. On each `ccs run <provider>`, MCP servers are merged into `~/<provider-config>/.claude.json`
+3. New servers are added, existing servers are updated
+
+### Verify MCP Sync
+
+```bash
+# Check MCP servers for a specific provider
+CLAUDE_CONFIG_DIR=~/.claude-glm claude mcp list
+```
 
 ## Troubleshooting
 
