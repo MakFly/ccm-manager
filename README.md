@@ -218,6 +218,31 @@ CCS automatically syncs MCP servers from `~/.claude.json` to all provider config
 
 When you run `ccs run glm`, your MCP servers (web-search, assistant-ui, etc.) are automatically available.
 
+### Adding MCP Servers (Important!)
+
+Always use `-s user` flag to add MCP servers globally:
+
+```bash
+# HTTP server
+claude mcp add my-server -s user --transport http https://api.example.com/mcp
+
+# stdio server (npx)
+claude mcp add next-devtools -s user -- npx next-devtools-mcp@latest
+
+# stdio server with args
+claude mcp add assistant-ui -s user -- npx -y @assistant-ui/mcp-docs-server
+```
+
+### MCP Scopes
+
+| Flag | Scope | Synced by CCS | Storage |
+|------|-------|---------------|---------|
+| `-s user` | Global | ✅ Yes | `~/.claude.json` |
+| `-s local` | Project (private) | ❌ No | Project config |
+| `-s project` | Project (shared) | ❌ No | `.mcp.json` |
+
+> **Rule**: Always use **`-s user`** so CCS syncs MCP servers to all providers.
+
 ### How it works
 
 1. MCP servers are stored in `~/.claude.json` (source of truth)
