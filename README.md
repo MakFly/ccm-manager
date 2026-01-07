@@ -17,23 +17,20 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 
 ## Installation
 
-### Option 1: npm/bun (Recommended)
+> **NOTE:** The npm package `cc-switch` is not yet published to npm. Please use the manual install or one-line install method.
 
-```bash
-# With bun (faster)
-bun install -g cc-switch
-
-# Or with npm
-npm install -g cc-switch
-```
-
-### Option 2: One-line install
+### Option 1: One-line install (Recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MakFly/ccm-manager/main/install.sh | bash
 ```
 
-### Option 3: Manual install
+This will:
+- Clone the repository to `~/.ccs`
+- Install dependencies (bun or npm required)
+- Create a default `.ccsignore` file to prevent OOM errors
+
+### Option 2: Manual install
 
 ```bash
 # Clone
@@ -48,15 +45,27 @@ echo 'eval "$(ccs alias)"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
+### Option 3: npm/bun (Not yet available)
+
+```bash
+# With bun (faster)
+bun install -g cc-switch
+
+# Or with npm
+npm install -g cc-switch
+```
+
+> **Coming soon:** The npm package will be published once stable. For now, please use Option 1 or 2.
+
 ## Updating
 
 ```bash
-# Self-update (auto-detects bun/npm)
-ccs update
+# Update to latest version
+cd ~/.ccs && git pull
 
-# Or manually
-bun update -g cc-switch
-npm update -g cc-switch
+# Rebuild
+bun install
+bun run build
 ```
 
 ## Quick Start
@@ -283,14 +292,12 @@ rm ~/.ccs/config.json
 ## Uninstall
 
 ```bash
-# If installed via npm/bun
-bun remove -g cc-switch
-# or
-npm uninstall -g cc-switch
-
-# If installed manually
+# Remove the installation directory
 rm -rf ~/.ccs
-# Remove lines from ~/.zshrc or ~/.bashrc
+
+# Remove lines from ~/.zshrc or ~/.bashrc:
+#   export PATH="$HOME/.ccs/bin:$PATH"
+#   eval "$(ccs alias)"
 ```
 
 ## Requirements

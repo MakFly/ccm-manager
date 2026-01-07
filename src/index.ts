@@ -319,23 +319,18 @@ program
   .action(() => {
     console.log(chalk.bold('Checking for updates...'));
 
-    // Detect package manager
-    const hasBun = spawnSync('which', ['bun'], { encoding: 'utf-8' }).status === 0;
-    const pm = hasBun ? 'bun' : 'npm';
-    const args = ['update', '-g', 'cc-switch'];
-
-    console.log(chalk.gray(`[ccs] Using ${pm} to update...`));
-
-    const result = spawnSync(pm, args, {
+    // Update via git pull (npm package not published yet)
+    const result = spawnSync('git', ['-C', expandPath('~/.ccs'), 'pull', '--quiet'], {
       stdio: 'inherit',
       shell: false
     });
 
     if (result.status === 0) {
       console.log(chalk.green(`\n✓ CCS updated successfully`));
+      console.log(chalk.gray('Run: bun run build'));
     } else {
       console.log(chalk.red('\n✗ Update failed'));
-      console.log(chalk.gray('Try manually: bun update -g cc-switch'));
+      console.log(chalk.gray('Try manually: cd ~/.ccs && git pull'));
       process.exit(1);
     }
   });

@@ -52,6 +52,69 @@ $PM install --quiet
 echo ""
 echo "✓ CCS installed to $INSTALL_DIR"
 echo ""
+
+# Create default .ccsignore to prevent OOM on large projects
+CCSIGNORE="$HOME/.ccsignore"
+if [ ! -f "$CCSIGNORE" ]; then
+  cat > "$CCSIGNORE" << 'EOF'
+# CCS Ignore - Exclude large directories from analysis
+# This prevents JavaScript heap out of memory errors
+
+# Symfony
+vendor/
+var/
+bin/
+public/bundles/
+
+# Laravel
+vendor/
+storage/
+bootstrap/cache/
+
+# Node.js
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Git
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+EOF
+  echo "✓ Created ~/.ccsignore with default exclusion patterns"
+else
+  echo "  ~/.ccsignore already exists, skipping"
+fi
+
+echo ""
 echo "Add to your shell config (~/.zshrc or ~/.bashrc):"
 echo ""
 echo '  export PATH="$HOME/.ccs/bin:$PATH"'

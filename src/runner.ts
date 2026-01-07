@@ -14,6 +14,7 @@ const SHARED_RESOURCES = [
   'CLAUDE.md',      // User instructions
   'AGENTS.md',      // Agent instructions (symlink to CLAUDE.md usually)
   'prompts',        // Prompt templates
+  '.ccsignore',     // File exclusion patterns (prevents OOM on large projects)
 ];
 
 const CLEAN_THRESHOLDS = {
@@ -132,18 +133,18 @@ function ensureSharedResources(configDir: string): void {
 }
 
 /**
- * Sync MCP servers from ~/.claude.json to the provider's config
- * MCP servers are stored in ~/.claude.json (not ~/.claude/.claude.json)
+ * Sync MCP servers from ~/.claude/.claude.json to the provider's config
+ * MCP servers are stored in ~/.claude/.claude.json (Claude Code's actual config)
  */
 function syncMcpServers(configDir: string): void {
   const targetDir = expandPath(configDir);
-  const homeDir = expandPath('~');
+  const sourceDir = expandPath('~/.claude');
 
-  // Skip if target is the default config (~/home dir)
-  if (targetDir === homeDir || targetDir === expandPath('~/.claude')) return;
+  // Skip if target is the default config
+  if (targetDir === sourceDir) return;
 
-  // Read MCP servers from ~/.claude.json (source of truth)
-  const sourceFile = join(homeDir, '.claude.json');
+  // Read MCP servers from ~/.claude/.claude.json (source of truth)
+  const sourceFile = join(sourceDir, '.claude.json');
   if (!existsSync(sourceFile)) return;
 
   try {
@@ -227,13 +228,13 @@ export function syncSharedResources(configDir: string, force = false): SyncResul
  */
 function syncMcpServersForSync(configDir: string, force = false): boolean | null {
   const targetDir = expandPath(configDir);
-  const homeDir = expandPath('~');
+  const sourceDir = expandPath('~/.claude');
 
   // Skip if target is the default config
-  if (targetDir === homeDir || targetDir === expandPath('~/.claude')) return null;
+  if (targetDir === sourceDir) return null;
 
-  // Read MCP servers from ~/.claude.json (source of truth)
-  const sourceFile = join(homeDir, '.claude.json');
+  // Read MCP servers from ~/.claude/.claude.json (source of truth)
+  const sourceFile = join(sourceDir, '.claude.json');
   if (!existsSync(sourceFile)) return null;
 
   try {
