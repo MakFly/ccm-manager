@@ -133,6 +133,30 @@ function ensureSharedResources(configDir: string): void {
 }
 
 /**
+ * Clean OAuth account from api_key provider configs
+ * OAuth credentials conflict with API token authentication
+ */
+function cleanOAuthFromApiKeyProvider(configDir: string): void {
+  const targetDir = expandPath(configDir);
+  const targetFile = join(targetDir, '.claude.json');
+
+  if (!existsSync(targetFile)) return;
+
+  try {
+    const data = JSON.parse(readFileSync(targetFile, 'utf-8'));
+
+    // If oauthAccount exists, remove it (it conflicts with ANTHROPIC_AUTH_TOKEN env var)
+    if (data.oauthAccount) {
+      delete data.oauthAccount;
+      writeFileSync(targetFile, JSON.stringify(data, null, 2));
+      console.error('[ccs] Removed OAuth credentials (using API token instead)');
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+/**
  * Sync MCP servers from ~/.claude/.claude.json to the provider's config
  * MCP servers are stored in ~/.claude/.claude.json (Claude Code's actual config)
  */
@@ -294,6 +318,11 @@ export function runClaude(providerKey: string, provider: Provider, args: string[
 
   // Share ~/.claude resources (commands, settings.json, agents, etc.) across providers
   ensureSharedResources(provider.configDir);
+
+  // For api_key providers, remove OAuth credentials to prevent conflicts
+  if (provider.type === 'api_key') {
+    cleanOAuthFromApiKeyProvider(provider.configDir);
+  }
 
   // Sync MCP servers from ~/.claude to this provider
   syncMcpServers(provider.configDir);
