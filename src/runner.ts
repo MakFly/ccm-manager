@@ -19,8 +19,13 @@ const SHARED_RESOURCES = [
 
 const CLEAN_THRESHOLDS = {
   'shell-snapshots': 10 * 1024 * 1024, // 10MB
-  'debug': 5 * 1024 * 1024             // 5MB
+  'debug': 5 * 1024 * 1024,            // 5MB
+  'history.jsonl': 2 * 1024 * 1024     // 2MB - pour GLM
 };
+
+// Maximum size for session .jsonl files before aggressive cleanup
+const MAX_SESSION_SIZE = 10 * 1024 * 1024; // 10MB
+const SESSION_TRUNCATION_RATIO = 0.2; // Keep only last 20% when truncating
 
 // Directories to wipe when memoryReset is enabled (prevents OOM on memory-hungry providers like GLM)
 const MEMORY_RESET_TARGETS = [
@@ -53,8 +58,27 @@ function autoClean(configDir: string): void {
 
   for (const [subdir, threshold] of Object.entries(CLEAN_THRESHOLDS)) {
     const path = join(dir, subdir);
-    const size = getDirSize(path);
 
+    // Special handling for history.jsonl (truncate instead of delete)
+    if (subdir === 'history.jsonl') {
+      if (existsSync(path)) {
+        try {
+          const stat = statSync(path);
+          if (stat.size > threshold) {
+            const beforeSize = stat.size;
+            truncateSessionFile(path, 0.3); // Keep 30% of history
+            const afterSize = statSync(path).size;
+            console.error(`[ccs] Auto-truncated history.jsonl (${Math.round(beforeSize / 1024)}KB → ${Math.round(afterSize / 1024)}KB)`);
+          }
+        } catch {
+          // Ignore errors
+        }
+      }
+      continue;
+    }
+
+    // For directories, use size-based cleanup
+    const size = getDirSize(path);
     if (size > threshold) {
       try {
         rmSync(path, { recursive: true, force: true });
@@ -85,6 +109,77 @@ function resetMemory(configDir: string): number {
   }
 
   return totalCleaned;
+}
+
+/**
+ * Truncate a .jsonl file keeping only the last N% of lines
+ * This mimics Anthropic's summarization behavior for GLM
+ */
+function truncateSessionFile(filePath: string, ratio: number = SESSION_TRUNCATION_RATIO): boolean {
+  if (!existsSync(filePath)) return false;
+
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+
+    if (lines.length <= 10) return false; // Keep small sessions as-is
+
+    // Keep only the last N% of lines (minimum 10 lines)
+    const keepCount = Math.max(10, Math.floor(lines.length * ratio));
+    const truncatedLines = lines.slice(-keepCount);
+
+    writeFileSync(filePath, truncatedLines.join('\n') + '\n');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clean oversized session files in projects directory
+ * This prevents .jsonl files from growing to 48MB+ like with GLM
+ */
+function cleanOversizedSessions(configDir: string): {cleaned: number, savedBytes: number} {
+  const projectsDir = join(expandPath(configDir), 'projects');
+  if (!existsSync(projectsDir)) return { cleaned: 0, savedBytes: 0 };
+
+  let cleaned = 0;
+  let savedBytes = 0;
+
+  try {
+    const projectDirs = readdirSync(projectsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+
+    for (const projectDir of projectDirs) {
+      const projectPath = join(projectsDir, projectDir);
+      const jsonlFiles = readdirSync(projectPath)
+        .filter(f => f.endsWith('.jsonl') && f !== 'sessions-index.json');
+
+      for (const jsonlFile of jsonlFiles) {
+        const filePath = join(projectPath, jsonlFile);
+        try {
+          const stat = statSync(filePath);
+
+          if (stat.size > MAX_SESSION_SIZE) {
+            const beforeSize = stat.size;
+            const truncated = truncateSessionFile(filePath);
+            if (truncated) {
+              const afterSize = statSync(filePath).size;
+              savedBytes += (beforeSize - afterSize);
+              cleaned++;
+            }
+          }
+        } catch {
+          // Skip files that can't be processed
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return { cleaned, savedBytes };
 }
 
 function ensureSymlink(source: string, target: string, force = false): boolean {
@@ -126,7 +221,9 @@ function ensureSharedResources(configDir: string): void {
   const targetDir = expandPath(configDir);
 
   for (const resource of SHARED_RESOURCES) {
-    const source = join(baseSource, resource);
+    const source = resource === '.ccsignore'
+      ? expandPath('~/.ccsignore')
+      : join(baseSource, resource);
     const target = join(targetDir, resource);
     ensureSymlink(source, target);
   }
@@ -217,7 +314,9 @@ export function syncSharedResources(configDir: string, force = false): SyncResul
   const results: SyncResult[] = [];
 
   for (const resource of SHARED_RESOURCES) {
-    const source = join(baseSource, resource);
+    const source = resource === '.ccsignore'
+      ? expandPath('~/.ccsignore')
+      : join(baseSource, resource);
     const target = join(targetDir, resource);
 
     if (!existsSync(source)) {
@@ -315,6 +414,14 @@ export function runClaude(providerKey: string, provider: Provider, args: string[
 
   // Auto-clean before launch
   autoClean(provider.configDir);
+
+  // Clean oversized session files (mimics Anthropic's summarization for GLM)
+  if (provider.memoryReset) {
+    const sessionResult = cleanOversizedSessions(provider.configDir);
+    if (sessionResult.cleaned > 0) {
+      console.error(`[ccs] Cleaned ${sessionResult.cleaned} oversized session(s), freed ${Math.round(sessionResult.savedBytes / 1024 / 1024)}MB`);
+    }
+  }
 
   // Share ~/.claude resources (commands, settings.json, agents, etc.) across providers
   ensureSharedResources(provider.configDir);
