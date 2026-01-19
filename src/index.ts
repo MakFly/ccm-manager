@@ -12,13 +12,14 @@ import {
   addProvider,
   removeProvider,
   getConfigPath,
+  expandPath,
   type Provider,
   type ProviderEnv
 } from './config.js';
 import { runClaude, syncSharedResources, type SyncResult } from './runner.js';
 import { generateAliases, getSetupInstructions } from './aliases.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 const program = new Command();
 

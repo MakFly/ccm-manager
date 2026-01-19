@@ -400,12 +400,13 @@ function syncMcpServersForSync(configDir: string, force = false): boolean | null
 }
 
 export function runClaude(providerKey: string, provider: Provider, args: string[]): number {
-  const configDir = expandPath(provider.configDir);
+  const configDir = expandPath(provider.configDir || '~/.claude');
+  const isDefaultConfig = configDir === expandPath('~/.claude');
 
   // Memory reset for providers that need it (e.g., GLM to prevent OOM)
   // Only purge if last reset was > 24h ago
   if (provider.memoryReset && shouldResetMemory(providerKey)) {
-    const cleaned = resetMemory(provider.configDir);
+    const cleaned = resetMemory(configDir);
     if (cleaned > 0) {
       console.error(`[ccs] Daily memory reset: cleared ${Math.round(cleaned / 1024 / 1024)}MB of cached data`);
     }
@@ -413,26 +414,29 @@ export function runClaude(providerKey: string, provider: Provider, args: string[
   }
 
   // Auto-clean before launch
-  autoClean(provider.configDir);
+  autoClean(configDir);
 
   // Clean oversized session files (mimics Anthropic's summarization for GLM)
   if (provider.memoryReset) {
-    const sessionResult = cleanOversizedSessions(provider.configDir);
+    const sessionResult = cleanOversizedSessions(configDir);
     if (sessionResult.cleaned > 0) {
       console.error(`[ccs] Cleaned ${sessionResult.cleaned} oversized session(s), freed ${Math.round(sessionResult.savedBytes / 1024 / 1024)}MB`);
     }
   }
 
-  // Share ~/.claude resources (commands, settings.json, agents, etc.) across providers
-  ensureSharedResources(provider.configDir);
+  // Only sync resources if using a custom configDir (not ~/.claude)
+  if (!isDefaultConfig) {
+    // Share ~/.claude resources (commands, settings.json, agents, etc.) across providers
+    ensureSharedResources(configDir);
 
-  // For api_key providers, remove OAuth credentials to prevent conflicts
-  if (provider.type === 'api_key') {
-    cleanOAuthFromApiKeyProvider(provider.configDir);
+    // Sync MCP servers from ~/.claude to this provider
+    syncMcpServers(configDir);
+
+    // For api_key providers, remove OAuth credentials to prevent conflicts
+    if (provider.type === 'api_key') {
+      cleanOAuthFromApiKeyProvider(configDir);
+    }
   }
-
-  // Sync MCP servers from ~/.claude to this provider
-  syncMcpServers(provider.configDir);
 
   // Build environment with increased memory limit for long conversations
   const currentNodeOptions = process.env['NODE_OPTIONS'] || '';

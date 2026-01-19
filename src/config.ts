@@ -15,7 +15,7 @@ const ProviderSchema = z.object({
   name: z.string().min(1, 'Provider name is required'),
   type: z.enum(['oauth', 'api_key']),
   description: z.string().optional(),
-  configDir: z.string().min(1, 'configDir is required'),
+  configDir: z.string().optional().default('~/.claude'),  // All providers use ~/.claude by default
   env: ProviderEnvSchema.optional(),
   memoryReset: z.boolean().optional(),  // Aggressive cleanup before each run (for memory-hungry providers)
 });
