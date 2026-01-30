@@ -23,17 +23,36 @@ const VERSION = '1.3.1';
 
 const program = new Command();
 
-// Interactive prompt helper
-function prompt(question: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout
+// Ensure clean exit on signals
+['SIGTERM', 'SIGINT'].forEach(signal => {
+  process.on(signal, () => {
+    process.exit(0);
   });
+});
 
-  return new Promise((resolve) => {
+// Interactive prompt helper with timeout
+function prompt(question: string, timeout: number = 30000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const timer = setTimeout(() => {
+      rl.close();
+      reject(new Error('Prompt timeout'));
+    }, timeout);
+
     rl.question(question, (answer) => {
+      clearTimeout(timer);
       rl.close();
       resolve(answer.trim());
+    });
+
+    rl.on('error', (err) => {
+      clearTimeout(timer);
+      rl.close();
+      reject(err);
     });
   });
 }

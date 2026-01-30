@@ -4,6 +4,10 @@ import { join, dirname } from 'path';
 import { expandPath, type Provider } from './config.js';
 import { shouldResetMemory, setLastMemoryReset } from './state.js';
 
+// Cache for directory sizes to avoid recursive rescans
+const dirSizeCache = new Map<string, { size: number; timestamp: number }>();
+const CACHE_TTL = 5000; // 5 seconds
+
 // Shared resources from ~/.claude to sync across all providers
 const SHARED_RESOURCES = [
   'commands',       // Custom slash commands
@@ -38,15 +42,25 @@ const MEMORY_RESET_TARGETS = [
 
 function getDirSize(path: string): number {
   if (!existsSync(path)) return 0;
+
+  // Check cache
+  const cached = dirSizeCache.get(path);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.size;
+  }
+
   try {
     const stat = statSync(path);
     if (!stat.isDirectory()) return stat.size;
 
-    // Simple recursive size calculation
     let size = 0;
-    for (const file of readdirSync(path)) {
+    const entries = readdirSync(path);
+    for (const file of entries) {
       size += getDirSize(join(path, file));
     }
+
+    // Cache result
+    dirSizeCache.set(path, { size, timestamp: Date.now() });
     return size;
   } catch {
     return 0;
