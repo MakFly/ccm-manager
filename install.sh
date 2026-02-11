@@ -114,10 +114,63 @@ else
   echo "  ~/.ccsignore already exists, skipping"
 fi
 
+# Build the binary
+echo "Building CCS..."
+if command -v bun &> /dev/null; then
+    bun run build
+fi
+
+# Interactive provider configuration
 echo ""
-echo "Add to your shell config (~/.zshrc or ~/.bashrc):"
+echo "=== Provider Configuration ==="
 echo ""
-echo '  export PATH="$HOME/.ccs/bin:$PATH"'
-echo '  eval "$(ccs alias)"'
+read -p "Do you want to configure a provider now? (y/N): " CONFIGURE
+if [[ "$CONFIGURE" =~ ^[yY]$ ]]; then
+    read -p "Provider name (e.g. glm): " PROVIDER_NAME
+    read -p "API key: " API_KEY
+    read -p "Base URL (optional, press Enter to skip): " BASE_URL
+    read -p "Model (optional, press Enter to skip): " MODEL
+
+    if [ -n "$PROVIDER_NAME" ] && [ -n "$API_KEY" ]; then
+        CONFIG_DIR="$HOME/.config/ccs"
+        mkdir -p "$CONFIG_DIR"
+        CONFIG_FILE="$CONFIG_DIR/config.json"
+
+        # Build provider JSON
+        PROVIDER_JSON="{\"apiKey\":\"$API_KEY\""
+        [ -n "$BASE_URL" ] && PROVIDER_JSON="$PROVIDER_JSON,\"baseUrl\":\"$BASE_URL\""
+        [ -n "$MODEL" ] && PROVIDER_JSON="$PROVIDER_JSON,\"model\":\"$MODEL\""
+        PROVIDER_JSON="$PROVIDER_JSON}"
+
+        if [ -f "$CONFIG_FILE" ]; then
+            # Merge into existing config using a temp approach
+            TMP=$(mktemp)
+            if command -v jq &> /dev/null; then
+                jq --arg name "$PROVIDER_NAME" --argjson prov "$PROVIDER_JSON" '.providers[$name] = $prov' "$CONFIG_FILE" > "$TMP" && mv "$TMP" "$CONFIG_FILE"
+            else
+                echo "{\"providers\":{\"$PROVIDER_NAME\":$PROVIDER_JSON}}" > "$CONFIG_FILE"
+            fi
+        else
+            echo "{\"providers\":{\"$PROVIDER_NAME\":$PROVIDER_JSON}}" > "$CONFIG_FILE"
+        fi
+        echo "✓ Provider '$PROVIDER_NAME' configured!"
+    else
+        echo "Skipped: provider name and API key are required."
+    fi
+fi
+
+# Add to PATH
+SHELL_RC="$HOME/.zshrc"
+PATH_LINE='export PATH="$HOME/.ccs/dist:$PATH"'
+if ! grep -qF '.ccs/dist' "$SHELL_RC" 2>/dev/null; then
+    echo "" >> "$SHELL_RC"
+    echo "# CCS - Claude Code Switch" >> "$SHELL_RC"
+    echo "$PATH_LINE" >> "$SHELL_RC"
+    echo "✓ Added CCS to PATH in ~/.zshrc"
+else
+    echo "  CCS already in PATH"
+fi
+
 echo ""
-echo "Then run: source ~/.zshrc"
+echo "✓ Installation complete!"
+echo "  Run: source ~/.zshrc && ccs --help"
