@@ -16,3 +16,6 @@ bun.lock
 # IDE
 .idea/
 .vscode/
+
+# Temporary scripts with secrets
+fix-config.sh

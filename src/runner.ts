@@ -270,6 +270,7 @@ function cleanOAuthFromApiKeyProvider(configDir: string): void {
 /**
  * Sync MCP servers from ~/.claude/.claude.json to the provider's config
  * MCP servers are stored in ~/.claude/.claude.json (Claude Code's actual config)
+ * NOTE: Only syncs servers WITHOUT credentials to prevent cross-provider pollution
  */
 function syncMcpServers(configDir: string): void {
   const targetDir = expandPath(configDir);
@@ -288,6 +289,23 @@ function syncMcpServers(configDir: string): void {
 
     if (Object.keys(sourceMcpServers).length === 0) return;
 
+    // Filter out MCP servers with credentials (prevent credential leakage)
+    const safeMcpServers: Record<string, unknown> = {};
+    for (const [name, server] of Object.entries(sourceMcpServers)) {
+      const serverObj = server as Record<string, unknown>;
+      // Skip servers with Authorization headers or external API URLs
+      const hasAuth = serverObj.headers && (serverObj.headers as Record<string, unknown>).Authorization;
+      const hasExternalUrl = serverObj.url && typeof serverObj.url === 'string' &&
+        !serverObj.url.startsWith('http://localhost') &&
+        !serverObj.url.startsWith('https://api.anthropic.com');
+
+      if (!hasAuth && !hasExternalUrl) {
+        safeMcpServers[name] = server;
+      }
+    }
+
+    if (Object.keys(safeMcpServers).length === 0) return;
+
     // Read or create target .claude.json inside the config directory
     const targetFile = join(targetDir, '.claude.json');
     let targetData: Record<string, unknown> = {};
@@ -299,9 +317,9 @@ function syncMcpServers(configDir: string): void {
       }
     }
 
-    // Merge MCP servers (source overwrites target)
+    // Merge only safe MCP servers
     const targetMcpServers = (targetData.mcpServers as Record<string, unknown>) || {};
-    const mergedMcpServers = { ...targetMcpServers, ...sourceMcpServers };
+    const mergedMcpServers = { ...targetMcpServers, ...safeMcpServers };
 
     const currentJson = JSON.stringify(targetMcpServers);
     const mergedJson = JSON.stringify(mergedMcpServers);
@@ -309,7 +327,7 @@ function syncMcpServers(configDir: string): void {
     if (currentJson !== mergedJson) {
       targetData.mcpServers = mergedMcpServers;
       writeFileSync(targetFile, JSON.stringify(targetData, null, 2));
-      console.error(`[ccs] Synced ${Object.keys(sourceMcpServers).length} MCP server(s) to ${configDir}`);
+      console.error(`[ccs] Synced ${Object.keys(safeMcpServers).length} safe MCP server(s) to ${configDir}`);
     }
   } catch (error) {
     console.error(`[ccs] Warning: Could not sync MCP servers: ${error}`);
@@ -459,8 +477,16 @@ export function runClaude(providerKey: string, provider: Provider, args: string[
     ? currentNodeOptions
     : `${currentNodeOptions} --max-old-space-size=8192`.trim();
 
+  // Start with clean env - filter out ANTHROPIC_* vars to prevent cross-provider pollution
+  const cleanEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && !key.startsWith('ANTHROPIC_')) {
+      cleanEnv[key] = value;
+    }
+  }
+
   const env: Record<string, string> = {
-    ...process.env,
+    ...cleanEnv,
     CLAUDE_CONFIG_DIR: configDir,
     NODE_OPTIONS: nodeOptions  // 8GB heap limit to prevent OOM on long conversations
   };
