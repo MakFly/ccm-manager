@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MakFly/ccm-manager.git"
+    "url": "git+https://github.com/dev-toolings/ccm-manager.git"
   },
   "keywords": [
     "claude",
@@ -29,9 +29,9 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/MakFly/ccm-manager/issues"
+    "url": "https://github.com/dev-toolings/ccm-manager/issues"
   },
-  "homepage": "https://github.com/MakFly/ccm-manager#readme",
+  "homepage": "https://github.com/dev-toolings/ccm-manager#readme",
   "engines": {
     "node": ">=18.0.0"
   },

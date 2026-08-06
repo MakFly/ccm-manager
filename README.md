@@ -22,7 +22,7 @@ Lightweight CLI to switch between AI model providers for Claude Code.
 ### Option 1: One-line install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MakFly/ccm-manager/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dev-toolings/ccm-manager/main/install.sh | bash
 ```
 
 This will:
@@ -34,7 +34,7 @@ This will:
 
 ```bash
 # Clone
-git clone https://github.com/MakFly/ccm-manager.git ~/.ccs
+git clone https://github.com/dev-toolings/ccm-manager.git ~/.ccs
 
 # Install dependencies
 cd ~/.ccs && bun install

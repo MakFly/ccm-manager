@@ -2,9 +2,9 @@
 set -e
 
 # CCS - Claude Code Switch Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/MakFly/ccm-manager/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/dev-toolings/ccm-manager/main/install.sh | bash
 
-REPO="MakFly/ccm-manager"
+REPO="dev-toolings/ccm-manager"
 INSTALL_DIR="$HOME/.ccs"
 
 echo "Installing CCS (Claude Code Switch)..."
